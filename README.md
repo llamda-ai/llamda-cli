@@ -1,6 +1,6 @@
 # llamda-cli
 
-![llamda-cli](https://img.shields.io/pypi/v/llamda-cli?label=llamda-cli)(https://pypi.org/project/llamda-cli/)
+![llamda-cli](https://img.shields.io/pypi/v/llamda-cli?label=llamda-cli](https://pypi.org/project/llamda-cli/)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/llamda-ai/llamda-cli/release.yml?label=release)
 ![GitHub](https://img.shields.io/github/license/llamda-ai/llamda-cli)
 
