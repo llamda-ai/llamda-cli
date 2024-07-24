@@ -1,0 +1,57 @@
+name: Build, Tag, and Publish to PyPI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-tag-publish:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Get version from pyproject.toml
+      id: get_version
+      run: |
+        version=$(poetry version -s)
+        echo "VERSION=$version" >> $GITHUB_OUTPUT
+
+    - name: Check if version tag exists
+      id: check_tag
+      run: |
+        if git rev-parse "v${{ steps.get_version.outputs.VERSION }}" >/dev/null 2>&1; then
+          echo "TAG_EXISTS=true" >> $GITHUB_OUTPUT
+        else
+          echo "TAG_EXISTS=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create and push tag
+      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git tag -a "v${{ steps.get_version.outputs.VERSION }}" -m "Release ${{ steps.get_version.outputs.VERSION }}"
+        git push origin "v${{ steps.get_version.outputs.VERSION }}"
+
+    - name: Build package
+      run: poetry build
+
+    - name: Publish to PyPI
+      if: steps.check_tag.outputs.TAG_EXISTS == 'false'
+      env:
+        PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        poetry config pypi-token.pypi $PYPI_TOKEN
+        poetry publish

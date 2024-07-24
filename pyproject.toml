@@ -12,6 +12,7 @@ Jinja2 = "^3.1.4"
 click = "^8.1.7"
 console = "^0.9907"
 rich = "^13.7.1"
+rich-click = "^1.8.3"
 
 [build-system]
 requires = ["poetry-core"]

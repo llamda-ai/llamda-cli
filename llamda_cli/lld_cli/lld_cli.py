@@ -1,6 +1,6 @@
 """CLI for llamdadoc."""
 
-import click
+import rich_click as click
 from llamda_cli.lld_utils import console
 from llamda_cli.lld_docs import collect_docs
 from llamda_cli.lld_utils import write_file
@@ -18,17 +18,32 @@ def main() -> None:
     "--outfile",
     type=click.Path(),
     required=False,
-    help="The output file path. \nDefaults to: \\[current_dir]/\\[source_dirname].xml",
+    help=r"""The output file path. Defaults to:
+    /{current_dir}/{source_dirname}.xml""",
 )
-@click.option("-v", "--verbose", is_flag=True, required=False, default=False)
-@click.option("-y", "--yes", is_flag=True, required=False, default=False)
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    required=False,
+    default=False,
+    help="Verbose output.",
+)
+@click.option(
+    "-y",
+    "--yes",
+    is_flag=True,
+    required=False,
+    default=False,
+    help="Automatically confirm all prompts.",
+)
 def docs(
     path: str,
     outfile: str | None = None,
     verbose: bool = False,
     yes: bool = False,
 ) -> None:
-    """Collect docs from a path and write them to an outfile."""
+    """Collect docs from a path and write them to an xml file ready for Anthropic's Claude."""
     console.set_verbose(verbose)
     console.set_yes(yes)
     if outfile is None:

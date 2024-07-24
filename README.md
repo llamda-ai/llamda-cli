@@ -4,10 +4,10 @@ A set of command line tools for working with LLMs.
 
 ## Installation
 
-To install the command line from remote, run:
+To install the CLI, run:
 
 ```bash
-pip install git+https://github.com/llamda-ai/llamda-cli.git
+pip install llamda-cli
 ```
 
 ## Usage
@@ -18,16 +18,35 @@ lld [OPTIONS] COMMAND [ARGS]...
 
 ### lld docs
 
-Collect docs from a path and write them to an outfile.
+Useful in case you use [Anthropic's Claude](https://console.anthropic.com/).
+
+Collect docs from a path and write them to an xml file.
 
 ```bash
-Usage: lld docs [OPTIONS] PATH
+ Usage: lld docs [OPTIONS] PATH                                                                
+                                                                                               
+ Collect docs from a path and write them to an xml file ready for Anthropic's Claude.          
+                                                                                               
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────╮
+│ --outfile  -o  PATH  The output file path. Defaults to: /{current_dir}/{source_dirname}.xml │
+│ --verbose  -v        Verbose output.                                                        │
+│ --yes      -y        Automatically confirm all prompts.                                     │
+│ --help               Show this message and exit.                                            │
+╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+```
 
-  Collect docs from a path and write them to an outfile.
+Output file format:
 
-Options:
-  -o, --outfile PATH
-  -v, --verbose
-  -y, --yes
-  --help
+```xml
+<collection>
+<title>Title</title>
+<document><path>path/to/file</path>
+<content>
+# Document Title
+
+Document content
+</content>
+</document>
+...
+</collection>
 ```
