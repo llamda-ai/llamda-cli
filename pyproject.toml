@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "llamda-cli"
-version = "0.1.3"
+version = "0.1.4"
 description = "Collects docs from a doc folder into a single xml file for use by claude"
 authors = ["lumpenspace <125578322+lumpenspace@users.noreply.github.com>"]
 license = "mit"
