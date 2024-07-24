@@ -13,7 +13,13 @@ def main() -> None:
 
 @main.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.option("-o", "--outfile", type=click.Path(), required=False)
+@click.option(
+    "-o",
+    "--outfile",
+    type=click.Path(),
+    required=False,
+    help="The output file path. \nDefaults to: \\[current_dir]/\\[source_dirname].xml",
+)
 @click.option("-v", "--verbose", is_flag=True, required=False, default=False)
 @click.option("-y", "--yes", is_flag=True, required=False, default=False)
 def docs(
