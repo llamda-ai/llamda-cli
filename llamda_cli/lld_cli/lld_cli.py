@@ -1,5 +1,6 @@
 """CLI for llamdadoc."""
 
+import os
 import rich_click as click
 from llamda_cli.lld_utils import console
 from llamda_cli.lld_docs import collect_docs
@@ -46,9 +47,10 @@ def docs(
     """Collect docs from a path and write them to an xml file ready for Anthropic's Claude."""
     console.set_verbose(verbose)
     console.set_yes(yes)
-    if outfile is None:
-        outfile = path.split(".")[0] + ".xml"
+
     content: str = collect_docs(path=path)
+    if outfile is None:
+        outfile = os.path.join(os.getcwd(), "output.xml")
     if len(content) == 0:
         raise ValueError("No content to write to file.")
     console.vprint()
