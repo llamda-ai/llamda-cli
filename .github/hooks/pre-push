@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Get the current version from pyproject.toml
+VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = //;s/"//g')
+
+# Check if the version tag already exists
+if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+    echo "Tag v$VERSION already exists. Skipping tag creation."
+else
+    echo "Creating new tag v$VERSION"
+    git tag -a "v$VERSION" -m "Release $VERSION"
+    echo "Tag v$VERSION created. Don't forget to push tags with 'git push --tags'"
+fi
+
+# Allow the push to proceed
+exit 0

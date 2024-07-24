@@ -16,11 +16,11 @@ pip install llamda-cli
 lld [OPTIONS] COMMAND [ARGS]...
 ```
 
-### lld docs
+### `lld docs`
 
 Useful in case you use [Anthropic's Claude](https://console.anthropic.com/).
 
-Collect docs from a path and write them to an xml file.
+Collects all markdown files from a directory (recursively) and writes them to an xml file.
 
 ```bash
  Usage: lld docs [OPTIONS] PATH                                                                
