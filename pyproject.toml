@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "llamda_cli"
+version = "0.1.0"
+description = "Collects docs from a doc folder into a single xml file for use by claude"
+authors = ["lumpenspace <125578322+lumpenspace@users.noreply.github.com>"]
+license = "mit"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+Jinja2 = "^3.1.4"
+click = "^8.1.7"
+console = "^0.9907"
+rich = "^13.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+lld = 'llamda_cli:cli'

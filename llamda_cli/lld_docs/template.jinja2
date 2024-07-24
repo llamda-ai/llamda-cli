@@ -1,0 +1,9 @@
+<collection><title>{{ title }}</title>
+{% for file in files %}
+<document><title>{{ file.name }}</title>
+<body>
+{{ file.content }}
+</body>
+</document>
+{% endfor %}
+</collection>
