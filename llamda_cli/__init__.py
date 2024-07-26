@@ -1,7 +1,5 @@
-"""llamda_cli package."""
+"""llamda_cli"""
 
-from .lld_docs import __all__ as docs
-from .lld_cli import main as cli
-from .lld_utils import __all__ as utils
+from .lld import cli, files, utils
 
-__all__: list[str] = ["docs", "cli", "utils"]
+__all__: list[str] = ["cli", "files", "utils"]

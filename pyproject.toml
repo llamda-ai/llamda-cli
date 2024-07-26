@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "llamda-cli"
-version = "0.1.10"
+version = "0.2.0"
 description = "Collects docs from a doc folder into a single xml file for use by claude"
 authors = ["lumpenspace <125578322+lumpenspace@users.noreply.github.com>"]
 license = "mit"
@@ -13,6 +13,10 @@ click = "^8.1.7"
 console = "^0.9907"
 rich = "^13.7.1"
 rich-click = "^1.8.3"
+gitpython = "^3.1.43"
+
+[tool.poetry.group.dev.dependencies]
+mkdocs-click = "^0.8.1"
 
 [build-system]
 requires = ["poetry-core"]

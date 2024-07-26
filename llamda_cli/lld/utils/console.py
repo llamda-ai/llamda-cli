@@ -41,6 +41,16 @@ class VConsole:
         """Set the autoconfirm mode."""
         self.yes: bool = yes
 
+    def yes_or_ask(self, question: str, yes: bool = True) -> bool:
+        """
+        If yes is True, returns True.
+        If yes is False, asks the user if they want to include the file or folder.
+        """
+        if yes:
+            return True
+        return self.ask(question, default=True)
+
 
 # Create a global instance of VerboseConsole
 console = VConsole()
+__all__: list[str] = ["console"]

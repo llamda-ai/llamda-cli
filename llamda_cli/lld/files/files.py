@@ -4,9 +4,10 @@ CLI to collect docs from a folder for use with LLMs.
 
 import os
 from typing import List, Union
-from llamda_cli.lld_docs.get_md_files import get_md_files
 
-from llamda_cli.lld_utils import render_template, console, FileTree
+from ..utils.template import render_template
+from ..utils.files import get_files_of_type, FileTree
+from ..utils.console import console
 
 NestedStrings = Union[str, List[Union[str, "NestedStrings"]]]
 
@@ -24,9 +25,9 @@ def get_nested_keys(tree: FileTree) -> NestedStrings:
     return result
 
 
-def collect_docs(path: str) -> str:
+def collect_files(path: str, extension: str = ".md") -> str:
     """
-    Collects all .md files from a folder and subfolder into a single string,
+    Collects all files from a folder and subfolder into a single string,
     with XML demarcation and a table of contents.
     """
     title: str = os.path.basename(os.path.dirname(path))
@@ -37,7 +38,7 @@ def collect_docs(path: str) -> str:
             "\n\n[bold|yellow]Select files and folders to include:[/bold|yellow]"
         )
 
-    file_tree: FileTree = get_md_files(path, base_path=path)
+    file_tree: FileTree = get_files_of_type(path, base_path=path, extension=extension)
     files: list[dict[str, str]] = []
 
     def flatten_tree(tree: FileTree, prefix: str = "") -> None:
@@ -57,4 +58,4 @@ def collect_docs(path: str) -> str:
     return content
 
 
-__all__: list[str] = ["collect_docs"]
+__all__: list[str] = ["collect_files"]

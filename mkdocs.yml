@@ -1,0 +1,5 @@
+
+repo_url: https://github.com/llamda-ai/llamda-cli
+site_name: llamda cli
+plugins:
+  - mkdocs-click

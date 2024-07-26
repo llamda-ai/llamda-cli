@@ -1,0 +1,648 @@
+<collection><title></title>
+
+<document><path>llamda_cli/lld/utils/console.py</path>
+<content>
+"""CLI utils."""
+
+from typing import Any
+from rich.console import Console
+from rich.prompt import Confirm
+
+
+class VConsole:
+    """A console with verbose mode."""
+
+    def __init__(self, verbose: bool = False, yes: bool = False) -> None:
+        self.c = Console()
+        self.verbose = verbose
+        self.yes = yes
+
+    def ask(self, *args: Any, **kwargs: Any) -> bool:
+        """Confirm the user's choice."""
+        if self.yes:
+            return True
+        return Confirm.ask(*args, **kwargs)
+
+    def print(self, *args: Any, **kwargs: Any) -> None:
+        """Always print, regardless of verbose setting."""
+        self.c.print(*args, **kwargs)
+
+    def vprint(self, *args: Any, **kwargs: Any) -> None:
+        """Print only if verbose is True."""
+        if self.verbose:
+            self.c.print(*args, **kwargs)
+
+    def vlog(self, *args: Any, **kwargs: Any) -> None:
+        """Print only if verbose is True."""
+        if self.verbose:
+            self.c.log(*args, **kwargs)
+
+    def set_verbose(self, verbose: bool) -> None:
+        """Set the verbose mode."""
+        self.verbose: bool = verbose
+
+    def set_yes(self, yes: bool) -> None:
+        """Set the autoconfirm mode."""
+        self.yes: bool = yes
+
+    def yes_or_ask(self, question: str, yes: bool = True) -> bool:
+        """
+        If yes is True, returns True.
+        If yes is False, asks the user if they want to include the file or folder.
+        """
+        if yes:
+            return True
+        return self.ask(question, default=True)
+
+
+# Create a global instance of VerboseConsole
+console = VConsole()
+__all__: list[str] = ["console"]
+
+</content>
+</document>
+
+<document><path>llamda_cli/lld/utils/files.py</path>
+<content>
+"""Utilities for working with files."""
+
+from typing import Dict, Union, Callable, Any
+import os
+from pathlib import Path
+
+from .console import console
+
+
+IGNORED_PREFIXES: tuple[str, ...] = (
+    ".",
+    "_",
+    "release/",
+    "venv/",
+    "dist/",
+    "build/",
+    "__pycache__",
+)
+
+FileTree = Dict[str, Union[str, "FileTree"]]
+
+
+def write_file(path: str, content: str) -> None:
+    """Write content to a file."""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def normalise_path(path: str) -> Path:
+    """Normalise a path."""
+    return Path(path)
+
+
+def is_binary(path: Path) -> bool:
+    """Check if a file is binary."""
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            f.readline()
+    except UnicodeDecodeError:
+        return True
+    return False
+
+
+def path_as_path(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Convert path arguments to Path objects."""
+
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        if not kwargs.get("path"):
+            return func(self, *args, **kwargs)
+
+        if "path" in kwargs and isinstance(kwargs["path"], (str, Path)):
+            kwargs["path"] = Path(kwargs["path"])
+
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def get_package_root() -> str:
+    """Get the path to the package root."""
+    current_dir: str = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(current_dir)
+
+
+def get_component_path(component_name: str, path: str) -> str:
+    """Get the path to a component's file."""
+    base_dir: str = get_package_root()
+
+    component_dirs: dict[str, str] = {
+        "files": "files",
+        "docs": "files",
+    }
+
+    component_dir: str = component_dirs.get(component_name, component_name)
+
+    full_path: str = os.path.join(base_dir, component_dir, path)
+
+    return os.path.abspath(full_path)
+
+
+def is_ignored(file: str) -> bool:
+    """
+    Check if a file is ignored.
+    """
+    from .git import giddit
+
+    return giddit().is_ignored(file) or any(
+        file.startswith(prefix) for prefix in IGNORED_PREFIXES
+    )
+
+
+def get_files_of_type(
+    path: str,
+    base_path: str = "",
+    yes: bool = False,
+    extension: str | tuple[str, ...] = "md",
+) -> FileTree:
+    """
+    Collects all files of a given type from a folder and subfolder into a nested dictionary,
+    with the name as key and the content as value (if file) or a nested dictionary
+    (if folder).
+    """
+    extensions: tuple[str, ...] = (
+        extension if isinstance(extension, tuple) else (extension,)
+    )
+    result: FileTree = {}
+
+    list_dir: list[str] = os.listdir(path)
+
+    for item in list_dir:
+        if is_ignored(item):
+            continue
+        item_path: str = os.path.join(path, item)
+        if os.path.isdir(item_path):
+
+            # prompt the user to skip the folder
+            if not console.yes_or_ask(
+                f":file_folder: {item_path.replace(base_path, '')}?", yes=yes
+            ):
+                continue
+            if not yes:
+                yes = console.ask("Include all files in this folder?", default=True)
+            result[item] = get_files_of_type(
+                item_path, base_path=base_path, yes=yes, extension=extensions
+            )
+        elif any(item.endswith(ext) for ext in extensions) and not is_ignored(item):
+            if not console.yes_or_ask(
+                f"\t :page_facing_up: {item}?",
+                yes=yes,
+            ):
+                continue
+            with open(item_path, "r", encoding="utf-8") as file:
+                result[item] = file.read()
+
+    return result
+
+
+__all__: list[str] = ["get_files_of_type", "FileTree"]
+
+</content>
+</document>
+
+<document><path>llamda_cli/lld/utils/git.py</path>
+<content>
+"""Git utils"""
+
+import os
+from pathlib import Path
+from typing import Any, Callable, Optional, TypedDict
+
+from git import Diff, IndexFile, NoSuchPathError, Repo
+
+from .console import console
+from .files import is_binary, path_as_path
+
+
+def null_if_no_repo(func: Callable[..., Any]) -> Callable[..., Any | None]:
+    """Decorator which, applied to methods, returns null
+    and logs if the instance has no self.repo"""
+    # pylint: disable=import-outside-toplevel
+
+    @path_as_path
+    def wrapper(self: "Git", *args: Any, **kwargs: Any) -> Any | None:
+        if self.no_repo:
+            console.vlog(
+                f"Calling {func.__name__} No repo found for {self.__class__.__name__}"
+            )
+            return None
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+class GitDiff(TypedDict):
+    """Git diff"""
+
+    full_file: str
+    diff_sections: list[dict[str, list[str]]]
+
+
+class Git:
+    """Git utils"""
+
+    @path_as_path
+    def __init__(self, path: Path) -> None:
+        """Initialize the git utils"""
+        try:
+            self.no_repo = False
+            self.repo = Repo(path)
+        except NoSuchPathError:
+            self.no_repo = True
+            self.repo: Repo
+
+    @classmethod
+    def init(cls, path: Path) -> Optional["Git"]:
+        """Initialize the git utils"""
+        try:
+            return cls(path)
+        except NoSuchPathError:
+            return None
+
+    @property
+    @null_if_no_repo
+    def index(self) -> IndexFile:
+        """Get the index"""
+        return self.repo.index
+
+    @null_if_no_repo
+    def is_ignored(self, path: Path) -> bool:
+        """Check if the path is ignored"""
+        return len(self.repo.ignored(path)) > 0
+
+    @null_if_no_repo
+    def get_diff(self) -> dict[str, GitDiff]:
+        """Get the diff for each modified file"""
+        diff_data: dict[str, GitDiff] = {}
+        diff_index: list[Diff] = self.repo.index.diff(None)
+        for diff in diff_index:
+            if diff.a_path is None:
+                continue
+            file_path: str = diff.a_path
+
+            # skip ignored and binary files
+            if (
+                self.is_ignored(Path(file_path))
+                or diff.a_blob is None
+                or is_binary(Path(file_path))
+            ):
+                continue
+
+            # Get the full file content
+            full_file: str = diff.a_blob.data_stream.read().decode("utf-8")
+
+            # Get the diff
+            diff_text: str = self.repo.git.diff(file_path)
+
+            # Parse the diff to get before/after sections
+            sections: list[dict[str, list[str]]] = self._parse_diff(diff_text)
+
+            diff_data[file_path] = {"full_file": full_file, "diff_sections": sections}
+
+        return diff_data
+
+    def _parse_diff(self, diff_text: str) -> list[dict[str, list[str]]]:
+        """Parse the diff text to get before/after sections"""
+        sections: list[dict[str, list[str]]] = []
+        current_section: dict[str, list[str]] = {"before": [], "after": []}
+        lines: list[str] = diff_text.split("\n")
+
+        for line in lines:
+            if line.startswith("@@"):
+                if current_section["before"] or current_section["after"]:
+                    sections.append(current_section)
+                    current_section = {"before": [], "after": []}
+            elif line.startswith("-"):
+                current_section["before"].append(line[1:])
+            elif line.startswith("+"):
+                current_section["after"].append(line[1:])
+
+        if current_section["before"] or current_section["after"]:
+            sections.append(current_section)
+
+        # Merge sections if they are close together
+        merged_sections: list[dict[str, list[str]]] = []
+        for i, section in enumerate(sections):
+            if i > 0 and self._should_merge_diff_sections(merged_sections[-1], section):
+                merged_sections[-1]["before"].extend(section["before"])
+                merged_sections[-1]["after"].extend(section["after"])
+            else:
+                merged_sections.append(section)
+
+        return merged_sections
+
+    def _should_merge_diff_sections(
+        self, section1: dict[str, list[str]], section2: dict[str, list[str]]
+    ) -> bool:
+        """Check if two sections should be merged"""
+        total_lines: int = (
+            len(section1["before"])
+            + len(section1["after"])
+            + len(section2["before"])
+            + len(section2["after"])
+        )
+        gap = len(section2["before"]) - len(section1["after"])
+        return gap < 0.2 * total_lines
+
+
+class GitSingleton:
+    """Git singleton"""
+
+    _instance = None
+
+    @classmethod
+    def get_instance(cls) -> Git:
+        """Get the git instance"""
+        if cls._instance is None:
+            cls._instance = Git(os.getcwd())
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        """Reset the git instance"""
+        cls._instance = Git(os.getcwd())
+
+
+# Create a convenience function to get the Git instance
+def giddit() -> Git:
+    """Get the git instance"""
+    return GitSingleton.get_instance()
+
+
+__all__: list[str] = ["giddit"]
+
+</content>
+</document>
+
+<document><path>llamda_cli/lld/utils/template.py</path>
+<content>
+"""Utilities for working with templates."""
+
+import os
+from typing import Any
+
+from jinja2 import Environment, FileSystemLoader, Template
+from .files import get_component_path
+
+
+def render_template(
+    component_name: str,
+    template_name: str = "template.jinja2",
+    context: dict[str, Any] | None = None,
+) -> str:
+    """
+    Render a Jinja2 template given its path.
+
+    Args:
+        template_path (str): Path to the template file.
+        context (dict, optional): Dictionary containing variables to be passed to the template.
+
+    Returns:
+        str: Rendered template as a string.
+    """
+    template_dir: str = os.path.dirname(get_component_path(component_name, "templates"))
+    template_file: str = os.path.basename(template_name)
+
+    env = Environment(loader=FileSystemLoader(template_dir))
+    template: Template = env.get_template(template_file)
+
+    return template.render(context or {})
+
+
+__all__: list[str] = ["render_template"]
+
+</content>
+</document>
+
+<document><path>llamda_cli/lld/cli/lld_cli.py</path>
+<content>
+"""CLI for llamdadoc."""
+
+import rich_click as click
+
+from ..utils.git import GitSingleton
+from ..files import get_files
+from .option_decorators import with_outfile
+from .option_decorators import common_options
+from .option_decorators import with_extensions
+
+
+@click.group
+def lld() -> None:
+    """llamda's cli tools."""
+    # Reset the Git instance when the CLI is invoked
+    GitSingleton.reset_instance()
+
+
+@lld.command
+@common_options
+@with_extensions(default_extensions=[".py"])
+@with_outfile()
+def files(path: str, extension: str) -> str:
+    """Collect files from a path."""
+    content: str = get_files(path=path, extension=extension)
+    return content
+
+
+@lld.command(deprecated=True)
+@common_options
+@with_outfile()
+def docs(
+    path: str,
+) -> str:
+    """Collect docs from a path and write them to an xml file ready for Anthropic's Claude."""
+
+    content: str = get_files(path=path, extension=".md")
+    return content
+
+
+__all__: list[str] = ["lld"]
+
+</content>
+</document>
+
+<document><path>llamda_cli/lld/cli/option_decorators.py</path>
+<content>
+"""decorators for common options and other arguments"""
+
+import functools
+from functools import wraps
+import os
+from typing import Any, Callable, List
+
+import rich_click as click
+
+from ..utils.console import console
+
+
+def common_options(func: Callable[..., Any]) -> Callable[..., Any]:
+    """adds the common args and options to a command: path, verbose, yes"""
+
+    @click.argument("path", type=click.Path(exists=True), required=True, default=".")
+    @click.option(
+        "-v",
+        "--verbose",
+        is_flag=True,
+        required=False,
+        default=False,
+        help="Verbose output.",
+    )
+    @click.option(
+        "-y",
+        "--yes",
+        is_flag=True,
+        required=False,
+        default=False,
+        help="Automatically confirm all prompts.",
+    )
+    @functools.wraps(func)
+    def wrapper(
+        *args: Any, verbose: bool = False, yes: bool = False, **kwargs: Any
+    ) -> Any:
+
+        console.set_verbose(verbose)
+        console.set_yes(yes)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def with_extensions(default_extensions: List[str]) -> Callable[..., Any]:
+    """Decorator to add an extensions option to a command."""
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @click.option(
+            "--extension",
+            "-e",
+            type=click.STRING,
+            multiple=True,
+            help="The extension(s) of the files to search for.",
+            default=default_extensions,
+        )
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Callable[..., Any]:
+            extension: tuple[str, ...] = kwargs.get("extension", ())
+            if not extension:
+                extension = tuple(default_extensions)
+
+            kwargs["extension"] = extension
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def with_outfile(default_extension: str = ".xml") -> Callable[..., Any]:
+    """Decorator to add an outfile option to a command."""
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @click.option(
+            "-o",
+            "--outfile",
+            type=click.Path(),
+            required=False,
+            default=None,
+            help=r"""The output file path. Defaults to:
+            /{current_dir}/{source_dirname}{default_extension}""",
+        )
+        @wraps(func)
+        def wrapper(*args: Any, outfile: str | None = None, **kwargs: Any) -> Any:
+            result = func(*args, **kwargs)
+
+            if outfile is None:
+                current_dir = os.getcwd()
+                source_dirname = os.path.basename(current_dir)
+                outfile = os.path.join(
+                    current_dir, f"{source_dirname}{default_extension}"
+                )
+
+            # Write the result to the outfile
+            with open(outfile, "w", encoding="utf-8") as f:
+                f.write(str(result))
+
+            console.c.log(f"Wrote {outfile}")
+            return result
+
+        return wrapper
+
+    return decorator
+
+</content>
+</document>
+
+<document><path>llamda_cli/lld/files/files.py</path>
+<content>
+"""
+CLI to collect docs from a folder for use with LLMs.
+"""
+
+import os
+from typing import List, Union
+
+from ..utils.template import render_template
+from ..utils.files import get_files_of_type, FileTree
+from ..utils.console import console
+
+NestedStrings = Union[str, List[Union[str, "NestedStrings"]]]
+
+
+def get_nested_keys(tree: FileTree) -> NestedStrings:
+    """
+    Get the keys of a nested dictionary.
+    """
+    result: list[NestedStrings] = []
+    for key, value in tree.items():
+        if isinstance(value, dict):
+            result.append([key, get_nested_keys(value)] if len(value) > 0 else key)
+        else:
+            result.append(key if len(value) > 0 else key)
+    return result
+
+
+def collect_files(path: str, extension: str = ".md") -> str:
+    """
+    Collects all files from a folder and subfolder into a single string,
+    with XML demarcation and a table of contents.
+    """
+    title: str = os.path.basename(os.path.dirname(path))
+    console.vprint(f"[bold|yellow]{title}[/bold|yellow] ({path})")
+
+    if not console.yes:
+        console.print(
+            "\n\n[bold|yellow]Select files and folders to include:[/bold|yellow]"
+        )
+
+    file_tree: FileTree = get_files_of_type(path, base_path=path, extension=extension)
+    files: list[dict[str, str]] = []
+
+    def flatten_tree(tree: FileTree, prefix: str = "") -> None:
+        for name, content in tree.items():
+            if isinstance(content, dict):
+                flatten_tree(content, f"{prefix}{name}/")
+            else:
+                files.append({"name": f"{prefix}{name}", "content": content})
+
+    flatten_tree(file_tree)
+
+    # Render the template
+    content: str = render_template(
+        component_name="docs",
+        context={"title": title, "files": files},
+    )
+    return content
+
+
+__all__: list[str] = ["collect_files"]
+
+</content>
+</document>
+
+</collection>

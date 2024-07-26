@@ -1,6 +1,6 @@
 """llamda_cli package."""
 
 from click import Group
-from .lld_cli import main
+from .lld_cli import lld
 
-main: Group = main
+cli: Group = lld
